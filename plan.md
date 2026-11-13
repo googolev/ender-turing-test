@@ -192,13 +192,16 @@ code $MEMBER $B/users/me                                   # 200
   - `is_superuser` удаляется;
   - `role` есть в `UserCreate`, `UserUpdate` и `UserPublic`;
   - в `UserRegister` и `UserUpdateMe` поля `role` **нет**.
-- Миграция, одна транзакция:
-  - upgrade: добавить `role` с `server_default 'member'` → `UPDATE "user" SET role='admin' WHERE is_superuser` → удалить `is_superuser`;
-  - downgrade: вернуть `is_superuser = (role = 'admin')` и удалить `role`. Роль manager при откате превращается в обычного пользователя, это описано в docstring миграции.
-- Все проверки `is_superuser` в backend и frontend механически меняются на `role == admin`. Admin полностью наследует права бывшего суперюзера, manager пока ведёт себя как member.
+- Миграция `91ade4d27122`, одна транзакция:
+  - upgrade: добавить `role VARCHAR(20) NOT NULL` с `server_default 'member'` → `CHECK ck_user_role` → `UPDATE "user" SET role='admin' WHERE is_superuser` → удалить `is_superuser`;
+  - downgrade: вернуть `is_superuser = (role = 'admin')`, убрать server default (как в исходной колонке), удалить `ck_user_role` и `role`. Роль manager при откате превращается в обычного пользователя, это описано в docstring миграции.
+  - Роль хранится как `VARCHAR` + `CHECK`, не нативный Postgres `ENUM`: такую колонку проще менять, откат не требует `DROP TYPE`. В модели это `sa.Enum(native_enum=False, create_constraint=True)`; `alembic check` подтверждает, что модель и схема совпадают.
+- Все проверки `is_superuser` в backend и frontend механически меняются на `role == admin`. Admin полностью наследует права бывшего суперюзера, manager пока ведёт себя как member. Тексты ошибок («Super users are not allowed…») и переменная `FIRST_SUPERUSER` не меняются.
+- **`UserCreate` и `UserUpdate` запрещают лишние поля (`extra="forbid"`), ответ 422.** Иначе старый клиент, отправивший `{"is_superuser": false}`, получил бы 200, а админ остался бы админом; то же с опечаткой вроде `is_activ`. Запрос с лишним полем не применяется даже частично. `/users/me` и `/signup` не затронуты. Конфиг задан через `SQLModelConfig` из `sqlmodel._compat`: аргумент класса `extra="forbid"` SQLModel молча игнорирует (проверено), а `ConfigDict` не проходит mypy/ty.
 - Frontend:
-  - клиент перегенерируется. На хосте нет bun и uv: `openapi.json` берётся из backend-контейнера, `openapi-ts` запускается в контейнере `oven/bun`;
-  - чекбокс «Is superuser?» в `AddUser`/`EditUser` заменяется на выбор роли, бейдж в таблице показывает роль.
+  - клиент перегенерируется. На хосте нет bun и uv: `openapi.json` берётся из backend-контейнера (`FASTAPI_ENV=development`, чтобы попал private API), `openapi-ts` запускается в образе playwright с примонтированным `./frontend/src` (монтировать сам `src/client` нельзя: генератор удаляет каталог вывода целиком);
+  - чекбокс «Is superuser?» в `AddUser`/`EditUser` заменяется на общий компонент `RoleSelect`, бейдж в таблице показывает роль;
+  - `AddUser` больше не отправляет `confirm_password`: с запретом лишних полей создание пользователя из админки иначе получало бы 422.
 - `init_db` создаёт `FIRST_SUPERUSER` с ролью admin.
 - `seed_data.py` создаёт **только отсутствующих** пользователей, уже с ролями: `manager@` становится manager, остальные демо-аккаунты получают member. Существующих пользователей сид не меняет.
 
@@ -251,17 +254,19 @@ code $MEMBER $B/users/me                                   # 200
 
 **Тесты**
 
-- `backend/tests/migrations/test_role_migration.py`:
-  - создаёт временную БД `app_migration_<random>`;
-  - накатывает миграции до `fe56fa70289e`;
-  - вставляет пользователей: активный суперюзер, неактивный суперюзер, обычный пользователь;
-  - накатывает `head` и проверяет роли и `is_active`;
-  - откатывает и проверяет `is_superuser`;
-  - в `finally` удаляет временную БД.
+- `backend/tests/migrations/test_role_migration.py`, каждый тест на своей временной БД `app_migration_<random>` (удаляется в `finally`):
+  - upgrade: активный и неактивный суперюзер → admin, обычные → member, `is_active` сохраняется, колонки `is_superuser` нет;
+  - вставка без `role` даёт member, `role = 'root'` отклоняется CHECK;
+  - downgrade: `is_superuser` только у admin, manager → false, `is_active` сохраняется, колонки `role` нет.
 
-  Alembic запускается отдельным процессом с подменённым `DATABASE_URL`, так что `alembic/env.py` менять не нужно.
-- Существующие тесты переводятся с `is_superuser` на `role`.
-- e2e `admin.spec.ts`: тест «Create a superuser» становится «Create an admin» с выбором роли.
+  Без миграции все 3 падали (`column "role" does not exist`). Alembic запускается отдельным процессом с подменённым `DATABASE_URL`, `alembic/env.py` не менялся.
+- `backend/tests/api/routes/test_users.py`, запрет лишних полей. Без `extra="forbid"` все 4 падали с 200:
+  - `PATCH` с `{"is_superuser": false}` → 422, роль осталась admin;
+  - `PATCH` с `{"full_name": …, "is_superuser": false}` → 422, имя не изменилось;
+  - `PATCH` с `{"is_activ": false}` → 422, пользователь активен;
+  - `POST` с `is_superuser` → 422, пользователь не создан.
+- Существующие тесты переведены с `is_superuser` на `role` (`test_users.py`, `test_login.py`, `crud/test_user.py`).
+- e2e `admin.spec.ts`: тест «Create a superuser» стал «Create an admin» с выбором роли; существующие тесты создания пользователя подтверждают исправление `confirm_password`.
 
 ---
 
@@ -269,97 +274,112 @@ code $MEMBER $B/users/me                                   # 200
 
 **Что меняется**
 
-- `app/core/permissions.py`, словарь `ROLE_PERMISSIONS`:
-  - admin: `users:read`, `users:manage`, `metrics:read`, `items:all`;
-  - manager: `users:read`, `metrics:read`;
-  - member: ничего из этого.
-- Зависимость `require_permission(...)` в `deps.py` заменяет `get_current_active_superuser`.
-- `UserPublic` отдаёт `permissions`: список, который вычисляет backend. Frontend про роли ничего не знает.
-- Новый `GET /api/v1/metrics/`, заглушка: число пользователей по ролям, активных и неактивных, число items.
-- Доступ к эндпоинтам:
-  - `GET /users/` и `GET /users/{id}` открыты при `users:read`;
-  - `POST/PATCH/DELETE /users`, `POST /utils/test-email/` и `POST /password-recovery-html-content/{email}` требуют `users:manage`;
-  - видеть и менять все items можно только с `items:all`, то есть admin.
-- Admin не может менять свою `role` и `is_active` и не может удалить себя: **403**. Удаление себя уже запрещено сейчас, добавляются роль и статус.
+- `app/core/permissions.py` — единственное место правил доступа: `UserRole` (переехал из `models.py`), `Permission`, `ROLE_PERMISSIONS`, `has_permission`, `permissions_for`.
 
-**Что нужно заранее:** этап 2 применён к `app`, `manager@` получил роль manager.
+  | Право | admin | manager | member |
+  |---|---|---|---|
+  | `users:read`: список и карточки пользователей | ✓ | ✓ | — |
+  | `users:manage`: создание, изменение, удаление, роль и статус | ✓ | — | — |
+  | `metrics:read` | ✓ | ✓ | — |
+  | `items:all`: **чужие** items | ✓ | — | — |
+  | `system:manage`: служебный `test-email` | ✓ | — | — |
 
-**Как проверить: матрица доступа**
+  Admin получает все права, включая будущие (`frozenset(Permission)`).
+- `deps.py`: фабрика `require_permission(Permission.X)` заменила `get_current_active_superuser`, старая зависимость удалена.
+- Эндпоинты:
+  - `GET /users/` — `users:read`; `GET /users/{id}` — свой профиль или `users:read`;
+  - `POST /users/`, `PATCH /users/{id}`, `DELETE /users/{id}`, `POST /password-recovery-html-content/{email}` (отдаёт ссылку сброса пароля чужого аккаунта) — `users:manage`;
+  - `POST /utils/test-email/` — `system:manage`;
+  - новый `GET /metrics/` — `metrics:read`, заглушка: `users_total`, `users_active`, `users_by_role`, `items_total`.
+- **Items.** Список `GET /items/` и чтение/изменение/удаление **своих** items доступны всем ролям. `items:all` только расширяет доступ на чужие items: admin видит и меняет все, manager и member — только свои, на чужие 403.
+- `GET /users/me` отдаёт `permissions` (`UserMePublic`), вычисленные по роли на каждом запросе. В списке пользователей прав нет.
+- Admin не может **изменить** себе `role` или `is_active` (403). Те же значения проходят: форма Edit User отправляет их и при правке своего имени. Удалить себя admin не может, как и раньше.
+- Найден и исправлен баг исходного шаблона: `password-recovery-html-content` отдавал заголовок с недопустимым именем `"subject:"`, на живом сервере соединение обрывалось (`RuntimeError: Invalid HTTP header name`, есть в upstream `master`). Тест прав для admin его поймал; исправление — `"subject"`.
+
+**Что нужно заранее:** этап 2 применён к `app`.
+
+**Как проверить: матрица доступа.** Проверки идут на временных пользователях, которых в конце удаляет admin: данные `app` не меняются, `manager@` трогать не нужно.
 
 ```bash
-ADMIN=$(tok admin@example.com changethis); MANAGER=$(tok manager@example.com password123); MEMBER=$(tok alice@example.com password123)
+ADMIN=$(tok admin@example.com changethis)
+send $ADMIN POST $B/users/ '{"email":"tmp-manager@example.com","password":"password123","role":"manager"}'   # 200
+send $ADMIN POST $B/users/ '{"email":"tmp-member@example.com","password":"password123"}'                     # 200
+MANAGER=$(tok tmp-manager@example.com password123); MEMBER=$(tok tmp-member@example.com password123)
 BOB=$(uid bob@example.com)
 for T in ADMIN MANAGER MEMBER; do t=${!T}; echo "== $T"
-  echo "GET /users/me      $(code $t $B/users/me)"
+  echo "me.permissions     $(show $t $B/users/me | python -c "import sys,json;print(json.load(sys.stdin)['permissions'])")"
   echo "GET /users/        $(code $t $B/users/)"
   echo "GET /users/{bob}   $(code $t $B/users/$BOB)"
   echo "GET /metrics/      $(code $t $B/metrics/)"
-  echo "POST test-email    $(send $t POST "$B/utils/test-email/?email_to=x@example.com")"
-  echo "items count        $(show $t $B/items/?limit=500 | python -c "import sys,json;print(json.load(sys.stdin)['count'])")"
+  echo "PATCH bob name     $(send $t PATCH $B/users/$BOB '{"full_name":"Bob Brown"}')"
+  echo "recovery html      $(send $t POST $B/password-recovery-html-content/bob@example.com)"
 done
 ```
 
 | Запрос | admin | manager | member |
 |---|---|---|---|
-| `GET /users/me` | 200 | 200 | 200 |
+| `permissions` | все 5 | `metrics:read`, `users:read` | `[]` |
 | `GET /users/` | 200 | 200 | **403** |
 | `GET /users/{bob}` | 200 | 200 | **403** |
 | `GET /metrics/` | 200 | 200 | **403** |
-| `POST /utils/test-email/` | 200 | **403** | **403** |
-| `GET /items/` (count) | все | только свои | только свои |
+| `PATCH /users/{bob}` (то же имя) | 200 | **403** | **403** |
+| `POST /password-recovery-html-content/bob@…` | 200 | **403** | **403** |
 
-Изменение пользователей. Каждый блок откатывает свои изменения:
+Items — свои и чужие:
 
 ```bash
-# смена роли
-send $MANAGER PATCH $B/users/$BOB '{"role":"manager"}'      # 403
-send $MEMBER  PATCH $B/users/$BOB '{"role":"manager"}'      # 403
-send $ADMIN   PATCH $B/users/$BOB '{"role":"manager"}'      # 200
-send $ADMIN   PATCH $B/users/$BOB '{"role":"member"}'       # 200, откат
-
-# создание, деактивация и удаление на временном пользователе
-send $MANAGER POST $B/users/ '{"email":"tmp@example.com","password":"password123"}'   # 403
-send $ADMIN   POST $B/users/ '{"email":"tmp@example.com","password":"password123"}'   # 200
-TMP=$(uid tmp@example.com)
-send $MANAGER PATCH  $B/users/$TMP '{"is_active":false}'   # 403
-send $MANAGER DELETE $B/users/$TMP                          # 403
-send $ADMIN   DELETE $B/users/$TMP                          # 200, откат
-
-# admin не может лишить доступа себя
-ME=$(uid admin@example.com)
-send $ADMIN PATCH  $B/users/$ME '{"role":"member"}'         # 403
-send $ADMIN PATCH  $B/users/$ME '{"is_active":false}'       # 403
-send $ADMIN DELETE $B/users/$ME                             # 403
+ITEM=$(curl -s -X POST -H "Authorization: Bearer $MEMBER" -H 'Content-Type: application/json' -d '{"title":"tmp item"}' $B/items/ | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
+code $MEMBER  $B/items/$ITEM                                   # 200, свой
+send $MEMBER  PUT $B/items/$ITEM '{"title":"renamed by owner"}'   # 200
+code $MANAGER $B/items/$ITEM                                   # 403, чужой
+send $MANAGER PUT $B/items/$ITEM '{"title":"renamed by manager"}' # 403
+send $MANAGER DELETE $B/items/$ITEM                            # 403
+code $ADMIN   $B/items/$ITEM                                   # 200, items:all
+show $MANAGER "$B/items/?limit=500" | python -c "import sys,json;print(json.load(sys.stdin)['count'])"   # 0: у временного менеджера своих нет
+show $MEMBER  $B/items/$ITEM | python -c "import sys,json;print(json.load(sys.stdin)['title'])"          # renamed by owner
 ```
 
-Через публичные эндпоинты нельзя повысить себе роль:
+Смена роли действует на уже выданный токен, и `/users/me` сразу отдаёт новые права:
 
 ```bash
-curl -s -X POST $B/users/signup -H 'Content-Type: application/json' -d '{"email":"eve@example.com","password":"password123","role":"admin"}'; echo   # 200, в ответе "role":"member"
+MGR_ID=$(uid tmp-manager@example.com)
+send $ADMIN PATCH $B/users/$MGR_ID '{"role":"member"}'      # 200
+code $MANAGER $B/users/                                     # 403 тем же токеном
+show $MANAGER $B/users/me                                   # "role":"member","permissions":[]
+send $ADMIN PATCH $B/users/$MGR_ID '{"role":"manager"}'     # 200
+show $MANAGER $B/users/me                                   # "permissions":["metrics:read","users:read"]
+```
+
+Повысить себе роль нельзя, admin не может лишить доступа себя:
+
+```bash
 send $MEMBER PATCH $B/users/me '{"role":"admin"}'           # 200, но роль не изменилась
 show $MEMBER $B/users/me                                    # "role":"member"
-code $MEMBER $B/users/                                      # 403
-send $ADMIN DELETE $B/users/$(uid eve@example.com)          # 200, откат
+ME=$(uid admin@example.com)
+send $ADMIN PATCH $B/users/$ME '{"role":"member"}'          # 403
+send $ADMIN PATCH $B/users/$ME '{"is_active":false}'        # 403
+send $ADMIN PATCH $B/users/$ME '{"role":"admin","is_active":true}'   # 200: значения не меняются
 ```
 
-Смена роли действует на уже выданный токен:
+Откат — удалить временных пользователей (их items удаляются каскадно):
 
 ```bash
-MGR=$(uid manager@example.com)
-code $MANAGER $B/users/                                     # 200
-send $ADMIN PATCH $B/users/$MGR '{"role":"member"}'         # 200
-code $MANAGER $B/users/                                     # 403 сразу, без перелогина
-send $ADMIN PATCH $B/users/$MGR '{"role":"manager"}'        # 200, откат
-code $MANAGER $B/users/                                     # 200
+send $ADMIN DELETE $B/users/$(uid tmp-manager@example.com)  # 200
+send $ADMIN DELETE $B/users/$(uid tmp-member@example.com)   # 200
 ```
 
 Под конец сверить контрольный снимок `app` с началом этапа.
 
-**Тесты:** `backend/tests/api/routes/test_access.py`.
-- Параметризованная матрица «роль × эндпоинт» по таблице выше, включая изменение пользователей.
-- Signup и `PATCH /users/me` не меняют роль.
-- Понижение и повышение роли сразу действуют на ранее выданный токен.
-- Admin не может изменить роль или статус себе и не может удалить себя.
+**Тесты:** `backend/tests/api/routes/test_access.py`, роли и права записаны строками, как их видит API:
+- `/users/me`: роль и `permissions` у каждой роли;
+- пользователи: список, чужая и своя карточка, создание, изменение имени/роли/статуса, удаление, recovery HTML, test-email — для каждой роли, с проверкой, что при 403 данные не изменились;
+- метрики: 200 для admin и manager, 403 для member, форма ответа;
+- items: список (свои у всех, чужие только у admin), чтение/изменение/удаление своих — 200 у всех, чужих — 200 только у admin, при 403 item не изменился и не удалён;
+- смена роли тем же токеном: доступ и `/users/me` (`role`, `permissions`) меняются сразу, в обе стороны;
+- signup и `PATCH /users/me` не повышают роль;
+- admin не может сменить себе роль или статус, а форма с неизменными значениями проходит.
+
+На коде этапа 2 по делу падали 12 тестов: нет `permissions` (3), manager получает 403 на просмотр пользователей (2), нет `/metrics/` (3), токен не видит новую роль (1), admin меняет себе роль и статус (2), recovery HTML у admin — баг с заголовком (1). Ещё 3 падали из-за моей ошибки в самом тесте (чтение `id` у удалённого item), исправлено. Тесты items на коде этапа 2 проходили: правила для items не менялись, это регрессионная сетка.
 
 ---
 
@@ -451,8 +471,9 @@ docker compose start
 | `tests/conftest.py` (защита) | тесты не запускаются против БД без суффикса `_test` |
 | `tests/api/test_deps.py` | 401 для невалидного и просроченного токена, деактивированного и удалённого пользователя; повторная активация возвращает сессию; 400 при логине неактивного |
 | e2e `login.spec.ts` (Deactivated user…) | сессия деактивированного пользователя в браузере заканчивается переходом на `/login` |
-| `tests/migrations/test_role_migration.py` | `is_superuser` → `admin`, остальные → `member`, `is_active` сохраняется, downgrade обратим; работает на временной БД |
-| `tests/api/routes/test_access.py` | матрица ролей и эндпоинтов, нельзя повысить себе роль через signup и `/users/me`, смена роли действует на живой токен, admin не может лишить доступа себя |
+| `tests/migrations/test_role_migration.py` | `is_superuser` → `admin`, остальные → `member`, `is_active` сохраняется, CHECK и default работают, downgrade даёт `is_superuser` только admin; работает на временной БД |
+| `tests/api/routes/test_users.py` (rejects…) | админские `POST/PATCH /users` отвечают 422 на `is_superuser` и опечатки, ничего не применяя |
+| `tests/api/routes/test_access.py` | матрица ролей и эндпоинтов, свои и чужие items, `permissions` в `/users/me`, смена роли тем же токеном меняет доступ и `permissions`, нельзя повысить себе роль через signup и `/users/me`, admin не может лишить доступа себя |
 | существующие тесты `tests/api/routes/*`, `tests/crud/*` | старое поведение не сломалось, admin = бывший суперюзер |
 | e2e `admin.spec.ts`, `roles.spec.ts` | интерфейс по ролям и редиректы при прямом переходе по адресу |
 
