@@ -1,0 +1,80 @@
+{
+  "policy": "Only credential values are substituted. Existing demo passwords changethis/password123 and documentation placeholders are retained. No messages or raw records are removed.",
+  "scan": "Exact local .env credential values, structured credential fields, credential assignments, JWTs, password hashes, provider API-token patterns, and private-key blocks. Associated screenshots were visually inspected.",
+  "limits": "Pattern-based scan; not a guarantee that every possible secret format has been recognized.",
+  "unique_values_by_category": {
+    "PASSWORD_HASH": 1
+  },
+  "records": [
+    {
+      "file": "raw/0578b893-cf0b-4ecf-b424-a257945bb512.jsonl",
+      "line": 284,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 2
+      }
+    },
+    {
+      "file": "raw/0578b893-cf0b-4ecf-b424-a257945bb512.jsonl",
+      "line": 287,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 1
+      }
+    },
+    {
+      "file": "raw/282f2a7b-6573-4e46-839a-58cbe0d38baf.jsonl",
+      "line": 284,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 2
+      }
+    },
+    {
+      "file": "raw/282f2a7b-6573-4e46-839a-58cbe0d38baf.jsonl",
+      "line": 287,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 1
+      }
+    },
+    {
+      "file": "raw/789a030a-8a17-41cd-ad0d-dabdef1068b9.jsonl",
+      "line": 164,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 2
+      }
+    },
+    {
+      "file": "raw/789a030a-8a17-41cd-ad0d-dabdef1068b9.jsonl",
+      "line": 1953,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 1
+      }
+    },
+    {
+      "file": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8.jsonl",
+      "line": 284,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 2
+      }
+    },
+    {
+      "file": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8.jsonl",
+      "line": 287,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 1
+      }
+    },
+    {
+      "file": "raw/f75e8c76-41f5-43cc-b626-6731560c3012.jsonl",
+      "line": 284,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 2
+      }
+    },
+    {
+      "file": "raw/f75e8c76-41f5-43cc-b626-6731560c3012.jsonl",
+      "line": 287,
+      "replacements": {
+        "[REDACTED:PASSWORD_HASH:001]": 1
+      }
+    }
+  ]
+}
