@@ -8,6 +8,7 @@ Run inside the backend container:
 """
 
 import logging
+from typing import Any
 
 from sqlmodel import Session, func, select
 
@@ -21,8 +22,12 @@ logger = logging.getLogger(__name__)
 
 DEMO_PASSWORD = "password123"
 
-USERS: list[dict] = [
-    {"email": "manager@example.com", "full_name": "Maria Manager", "is_superuser": True},
+USERS: list[dict[str, Any]] = [
+    {
+        "email": "manager@example.com",
+        "full_name": "Maria Manager",
+        "is_superuser": True,
+    },
     {"email": "alice@example.com", "full_name": "Alice Anderson"},
     {"email": "bob@example.com", "full_name": "Bob Brown"},
     {"email": "carol@example.com", "full_name": "Carol Clark"},
