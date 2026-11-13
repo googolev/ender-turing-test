@@ -86,7 +86,9 @@ const AddUser = () => {
   })
 
   const onSubmit = (data: FormData) => {
-    mutation.mutate(data)
+    // The API rejects unknown fields, so confirm_password must not be sent.
+    const { confirm_password: _, ...submitData } = data
+    mutation.mutate(submitData)
   }
 
   return (

@@ -5,6 +5,7 @@ from enum import StrEnum
 import sqlalchemy as sa
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel._compat import SQLModelConfig  # SQLModel's own config type
 
 
 def get_datetime_utc() -> datetime:
@@ -41,8 +42,17 @@ class UserBase(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
 
 
+# Admin input models reject unknown fields (422) instead of ignoring them, so a
+# client still sending the removed is_superuser, or a typo, cannot get a 200
+# while the user's access stays unchanged. (Class keyword config such as
+# `class UserCreate(UserBase, extra="forbid")` is silently ignored by SQLModel.)
+ADMIN_INPUT_CONFIG = SQLModelConfig(extra="forbid")
+
+
 # Properties to receive via API on creation
 class UserCreate(UserBase):
+    model_config = ADMIN_INPUT_CONFIG
+
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -54,6 +64,8 @@ class UserRegister(SQLModel):
 
 # Properties to receive via API on update, all are optional
 class UserUpdate(SQLModel):
+    model_config = ADMIN_INPUT_CONFIG
+
     email: EmailStr | None = Field(default=None, max_length=255)
     is_active: bool | None = None
     role: UserRole | None = None
