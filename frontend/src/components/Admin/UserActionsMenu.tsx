@@ -18,9 +18,10 @@ interface UserActionsMenuProps {
 
 export const UserActionsMenu = ({ user }: UserActionsMenuProps) => {
   const [open, setOpen] = useState(false)
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, can } = useAuth()
 
-  if (user.id === currentUser?.id) {
+  // Admins manage other users here; nobody changes their own access.
+  if (user.id === currentUser?.id || !can("users:manage")) {
     return null
   }
 

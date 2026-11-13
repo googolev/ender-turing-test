@@ -1,4 +1,4 @@
-import { Briefcase, Home, Users } from "lucide-react"
+import { Briefcase, ChartColumn, Home, Users } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -18,11 +18,17 @@ const baseItems: Item[] = [
 ]
 
 export function AppSidebar() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, can } = useAuth()
 
-  const items = currentUser?.is_superuser
-    ? [...baseItems, { icon: Users, title: "Admin", path: "/admin" }]
-    : baseItems
+  const items: Item[] = [
+    ...baseItems,
+    ...(can("users:read")
+      ? [{ icon: Users, title: "Users", path: "/admin" }]
+      : []),
+    ...(can("metrics:read")
+      ? [{ icon: ChartColumn, title: "Metrics", path: "/metrics" }]
+      : []),
+  ]
 
   return (
     <Sidebar collapsible="icon">

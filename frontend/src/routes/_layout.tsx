@@ -1,4 +1,10 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useRouter,
+} from "@tanstack/react-router"
+import { useEffect, useRef } from "react"
 
 import { Footer } from "@/components/Common/Footer"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
@@ -7,7 +13,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { isLoggedIn } from "@/hooks/useAuth"
+import useAuth, { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
   component: Layout,
@@ -20,7 +26,26 @@ export const Route = createFileRoute("/_layout")({
   },
 })
 
+// The current user is refetched when the tab regains focus. If an admin changed
+// their role meanwhile, re-run the route guards so a page they lost access to
+// is left right away instead of on the next request that happens to get a 403.
+function useGuardsFollowPermissions() {
+  const { user } = useAuth()
+  const router = useRouter()
+  const permissions = user?.permissions.join(" ")
+  const previous = useRef(permissions)
+
+  useEffect(() => {
+    if (previous.current !== undefined && permissions !== previous.current) {
+      router.invalidate()
+    }
+    previous.current = permissions
+  }, [permissions, router])
+}
+
 function Layout() {
+  useGuardsFollowPermissions()
+
   return (
     <SidebarProvider>
       <AppSidebar />

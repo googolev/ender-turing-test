@@ -20,15 +20,33 @@ client.setConfig({
 })
 
 const handleApiError = (error: Error) => {
-  if (
-    error instanceof AxiosError &&
-    [401, 403].includes(error.response?.status ?? 0)
-  ) {
+  if (!(error instanceof AxiosError)) return
+  const status = error.response?.status
+  if (status === 401) {
+    // The session is gone: bad or expired token, or the user was deactivated or deleted.
     localStorage.removeItem("access_token")
     window.location.href = "/login"
+  } else if (status === 403) {
+    // Access denied, but the session is still valid. The user's access may have
+    // changed, so refresh the current user and re-run the route guards.
+    queryClient.invalidateQueries({ queryKey: ["currentUser"] })
+    router.invalidate()
   }
 }
+// Retrying a 4xx cannot change the answer; it only delays the reaction to a lost
+// session (401) or changed access (403). Network errors and 5xx still retry.
+const isClientError = (error: Error) => {
+  const status =
+    error instanceof AxiosError ? error.response?.status : undefined
+  return status !== undefined && status >= 400 && status < 500
+}
+
 const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => !isClientError(error) && failureCount < 3,
+    },
+  },
   queryCache: new QueryCache({
     onError: handleApiError,
   }),

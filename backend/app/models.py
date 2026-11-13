@@ -1,24 +1,53 @@
 import uuid
 from datetime import UTC, datetime
 
+import sqlalchemy as sa
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel._compat import SQLModelConfig  # SQLModel's own config type
+
+from app.core.permissions import Permission, UserRole
 
 
 def get_datetime_utc() -> datetime:
     return datetime.now(UTC)
 
 
+# Stored as VARCHAR with a CHECK constraint (not a native Postgres enum),
+# matching migration 91ade4d27122.
+user_role_type = sa.Enum(
+    UserRole,
+    name="ck_user_role",
+    native_enum=False,
+    create_constraint=True,
+    length=20,
+    values_callable=lambda roles: [role.value for role in roles],
+)
+
+
 # Shared properties
 class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
-    is_superuser: bool = False
+    role: UserRole = Field(
+        default=UserRole.MEMBER,
+        sa_type=user_role_type,
+        sa_column_kwargs={"server_default": UserRole.MEMBER.value},
+    )
     full_name: str | None = Field(default=None, max_length=255)
+
+
+# Admin input models reject unknown fields (422) instead of ignoring them, so a
+# client still sending the removed is_superuser, or a typo, cannot get a 200
+# while the user's access stays unchanged. (Class keyword config such as
+# `class UserCreate(UserBase, extra="forbid")` is silently ignored by SQLModel.)
+ADMIN_INPUT_CONFIG = SQLModelConfig(extra="forbid")
 
 
 # Properties to receive via API on creation
 class UserCreate(UserBase):
+    model_config = ADMIN_INPUT_CONFIG
+
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -30,9 +59,11 @@ class UserRegister(SQLModel):
 
 # Properties to receive via API on update, all are optional
 class UserUpdate(SQLModel):
+    model_config = ADMIN_INPUT_CONFIG
+
     email: EmailStr | None = Field(default=None, max_length=255)
     is_active: bool | None = None
-    is_superuser: bool | None = None
+    role: UserRole | None = None
     full_name: str | None = Field(default=None, max_length=255)
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
@@ -59,6 +90,12 @@ class User(UserBase, table=True):
 class UserPublic(UserBase):
     id: uuid.UUID
     created_at: datetime | None = None
+
+
+# The current user, with the permissions derived from their role. The frontend
+# shows or hides features from this list instead of knowing the role rules.
+class UserMePublic(UserPublic):
+    permissions: list[Permission]
 
 
 class UsersPublic(SQLModel):
@@ -124,3 +161,10 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class MetricsPublic(SQLModel):
+    users_total: int
+    users_active: int
+    users_by_role: dict[UserRole, int]
+    items_total: int

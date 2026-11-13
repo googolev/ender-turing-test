@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { redirect, useNavigate } from "@tanstack/react-router"
 
 import {
   type Body_login_login_access_token as AccessToken,
   LoginService,
-  type UserPublic,
+  type Permission,
+  type UserMePublic,
   type UserRegister,
   UsersService,
 } from "@/client"
@@ -15,12 +16,27 @@ const isLoggedIn = () => {
   return localStorage.getItem("access_token") !== null
 }
 
+// The backend derives permissions from the user's role; the UI only checks them.
+const hasPermission = (
+  user: UserMePublic | null | undefined,
+  permission: Permission,
+) => user?.permissions.includes(permission) ?? false
+
+// For a route's beforeLoad. Reads the user fresh rather than from the cache,
+// so a role changed by an admin applies on the next navigation.
+const requirePermission = async (permission: Permission) => {
+  const { data: user } = await UsersService.readUserMe()
+  if (!hasPermission(user, permission)) {
+    throw redirect({ to: "/" })
+  }
+}
+
 const useAuth = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
 
-  const { data: user } = useQuery<UserPublic | null, Error>({
+  const { data: user } = useQuery<UserMePublic | null, Error>({
     queryKey: ["currentUser"],
     queryFn: async () => (await UsersService.readUserMe()).data,
     enabled: isLoggedIn(),
@@ -58,13 +74,16 @@ const useAuth = () => {
     navigate({ to: "/login" })
   }
 
+  const can = (permission: Permission) => hasPermission(user, permission)
+
   return {
     signUpMutation,
     loginMutation,
     logout,
     user,
+    can,
   }
 }
 
-export { isLoggedIn }
+export { isLoggedIn, requirePermission }
 export default useAuth

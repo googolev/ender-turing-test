@@ -14,11 +14,21 @@ test("My profile tab is active by default", async ({ page }) => {
   )
 })
 
-test("All tabs are visible", async ({ page }) => {
-  await page.goto("/settings")
-  for (const tab of tabs) {
-    await expect(page.getByRole("tab", { name: tab })).toBeVisible()
-  }
+test.describe("Settings tabs for a regular user", () => {
+  // Admins have no Danger zone (they cannot delete themselves): see roles.spec.ts.
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  test("All tabs are visible", async ({ page }) => {
+    const email = randomEmail()
+    const password = randomPassword()
+    await createUser({ email, password })
+    await logInUser(page, email, password)
+
+    await page.goto("/settings")
+    for (const tab of tabs) {
+      await expect(page.getByRole("tab", { name: tab })).toBeVisible()
+    }
+  })
 })
 
 test.describe("Edit user profile", () => {

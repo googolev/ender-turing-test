@@ -1,0 +1,2 @@
+# Preserve exported bytes on both commit and checkout.
+* -text

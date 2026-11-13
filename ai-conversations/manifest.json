@@ -1,0 +1,116 @@
+{
+  "format": "claude-local-transcript-archive-v1",
+  "captured_at_utc": "2026-11-13T19:49:01.397296+00:00",
+  "source_project_directory": "C:\\Users\\Professional\\.claude\\projects\\D--work-gogolev-test",
+  "scope": "Five local Claude Code transcript files for the take-home task, with available tool-result images. Does not include Codex or web-only conversations.",
+  "raw_policy": "All source records and original byte formatting are preserved, except marked credential redactions. No raw messages are deduplicated or summarized.",
+  "files": [
+    {
+      "path": "raw/0578b893-cf0b-4ecf-b424-a257945bb512.jsonl",
+      "title": "btw: ты хочешь все коды привести к 401?",
+      "source_bytes": 3108706,
+      "export_bytes": 3108499,
+      "source_sha256": "956c95b3b874eef2d4bdccc5bc3c067a9ad4dd704340bb63ea662dbbee9664bc",
+      "export_sha256": "442f6b440d7fd79c3d325ba66f6fcbd4d08f2b6a0fc1a7e9e92b8d89ad77a1a6",
+      "records": 1134,
+      "message_records": 398,
+      "first_timestamp": "2026-11-13T15:19:05.148Z",
+      "last_timestamp": "2026-11-13T17:00:15.077Z",
+      "redacted": true
+    },
+    {
+      "path": "raw/282f2a7b-6573-4e46-839a-58cbe0d38baf.jsonl",
+      "title": "btw: чем это чревато? это нормальная практика? или мы костылим",
+      "source_bytes": 8242917,
+      "export_bytes": 8242710,
+      "source_sha256": "d9604c2f8794e70150786bc5b858ac2ab4fd04263602cbd6cfa1c6aeac228afd",
+      "export_sha256": "8d3642647cd16f13b69b3f9c2b9c60aa466ff53c0ea8674dba04ea58199bd2c6",
+      "records": 3691,
+      "message_records": 1404,
+      "first_timestamp": "2026-11-13T15:19:05.148Z",
+      "last_timestamp": "2026-11-13T19:20:06.674Z",
+      "redacted": true
+    },
+    {
+      "path": "raw/789a030a-8a17-41cd-ad0d-dabdef1068b9.jsonl",
+      "title": "Новый репозиторий ender-turing-test",
+      "source_bytes": 7887293,
+      "export_bytes": 7887086,
+      "source_sha256": "96cb3e70c872a2b8ae1b8f90fc1431fa5d0bede575d91d6dad1b404a7c56060c",
+      "export_sha256": "0fc6bbad45a16b93cc2633022a53db330de4e965d072be8f44e84318303aed0b",
+      "records": 2367,
+      "message_records": 1553,
+      "first_timestamp": "2026-11-13T15:19:05.148Z",
+      "last_timestamp": "2026-11-13T19:36:25.630Z",
+      "redacted": true
+    },
+    {
+      "path": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8.jsonl",
+      "title": "Новый репозиторий ender-turing-test",
+      "source_bytes": 9000059,
+      "export_bytes": 8999852,
+      "source_sha256": "e88160f73790a53d8c22cb7f6ab4add90e6a0b1d9ce1bcf508f4c6f07afb6c6c",
+      "export_sha256": "b34afdf86e5d985ad3e3d983ffe1267f9edc63ab92d6d50e1dbfa8cec2066998",
+      "records": 4036,
+      "message_records": 1550,
+      "first_timestamp": "2026-11-13T15:19:05.148Z",
+      "last_timestamp": "2026-11-13T19:34:05.738Z",
+      "redacted": true
+    },
+    {
+      "path": "raw/f75e8c76-41f5-43cc-b626-6731560c3012.jsonl",
+      "title": "Side chat",
+      "source_bytes": 1812160,
+      "export_bytes": 1811953,
+      "source_sha256": "a31e7faaaab4b501a495a689a626cba15f20fac9417593093ae19e4b6f1ac4d9",
+      "export_sha256": "5dd8d0b6de3903a2eb313a8d7d4f439d4577fafed57b6f2d61957e6429733c75",
+      "records": 599,
+      "message_records": 194,
+      "first_timestamp": "2026-11-13T15:19:05.148Z",
+      "last_timestamp": "2026-11-13T16:19:19.161Z",
+      "redacted": true
+    }
+  ],
+  "attachments": [
+    {
+      "path": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8/tool-results/mcp-Claude_Browser-blob-1794583953189-k67qwm.jpg",
+      "bytes": 7440,
+      "sha256": "5457407ba421fd24f72e56d7871013b9201f1e8e243d585111f76c64d285935c"
+    },
+    {
+      "path": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8/tool-results/mcp-Claude_Browser-blob-1794591751528-ijgf3i.jpg",
+      "bytes": 10849,
+      "sha256": "44622eb251510b1478ace874c15fd3aa24329a97c0184e2afc681a5f2bd6f034"
+    },
+    {
+      "path": "raw/e6b29ec5-7e77-474d-b1a7-13bf938636a8/tool-results/mcp-Claude_Browser-blob-1794595046879-amz074.jpg",
+      "bytes": 5455,
+      "sha256": "de9adff3649d0cecfc9404c66c1c92c486caff60d2e1fe9378b917967e93eac8"
+    }
+  ],
+  "full_transcript": {
+    "path": "transcript.md",
+    "sha256": "66c83d7abd20fb411dcac058f0ef4e72803268ff8e6d53d4f95d0471228e6397",
+    "source_message_records": 5099,
+    "unique_message_records": {
+      "user": 566,
+      "assistant": 1003
+    },
+    "rendered_events": 1655,
+    "source_line_coverage_verified": true,
+    "deduplication": "Only matching UUID + normalized role/content. Raw files are not deduplicated."
+  },
+  "readable": {
+    "path": "conversation.md",
+    "sha256": "9eff03ccef29b3fe3526f60164167dcda17ca64b53ab348fbba1590b93021049",
+    "text_message_records": {
+      "user": 46,
+      "assistant": 104
+    },
+    "policy": "All user/assistant text blocks, unabridged. Non-text blocks are linked in transcript.md and retained in raw JSONL."
+  },
+  "redaction_categories": {
+    "PASSWORD_HASH": 1
+  },
+  "source_files_unchanged_during_export": true
+}

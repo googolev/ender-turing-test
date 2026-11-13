@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
-import { randomPassword } from "./utils/random.ts"
+import { createUser } from "./utils/privateApi.ts"
+import { randomEmail, randomPassword } from "./utils/random.ts"
+import { logInUser, setUserActive } from "./utils/user.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -112,6 +114,22 @@ test("Redirects to /login when token is wrong", async ({ page }) => {
     localStorage.setItem("access_token", "invalid_token")
   })
   await page.goto("/settings")
+  await page.waitForURL("/login")
+  await expect(page).toHaveURL("/login")
+})
+
+test("Deactivated user with an open session is sent to /login", async ({
+  page,
+  request,
+}) => {
+  const email = randomEmail()
+  const password = randomPassword()
+  const user = await createUser({ email, password })
+  await logInUser(page, email, password)
+
+  await setUserActive(request, user.id, false)
+  await page.reload()
+
   await page.waitForURL("/login")
   await expect(page).toHaveURL("/login")
 })

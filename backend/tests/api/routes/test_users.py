@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.core.config import settings
+from app.core.permissions import UserRole
 from app.core.security import verify_password
 from app.models import User, UserCreate
 from tests.utils.user import create_random_user
@@ -19,7 +20,7 @@ def test_get_users_superuser_me(
     current_user = r.json()
     assert current_user
     assert current_user["is_active"] is True
-    assert current_user["is_superuser"]
+    assert current_user["role"] == "admin"
     assert current_user["email"] == settings.FIRST_SUPERUSER
 
 
@@ -30,7 +31,7 @@ def test_get_users_normal_user_me(
     current_user = r.json()
     assert current_user
     assert current_user["is_active"] is True
-    assert current_user["is_superuser"] is False
+    assert current_user["role"] == "member"
     assert current_user["email"] == settings.EMAIL_TEST_USER
 
 
@@ -519,3 +520,69 @@ def test_delete_user_without_privileges(
     )
     assert r.status_code == 403
     assert r.json()["detail"] == "The user doesn't have enough privileges"
+
+
+# Admin endpoints that change access reject unknown fields with 422 instead of
+# silently ignoring them: an old client sending is_superuser=false (or a typo
+# like is_activ) must not get a 200 while the user keeps their access.
+
+
+def test_update_user_rejects_removed_is_superuser_field(
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+) -> None:
+    admin = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=random_email(), password=random_lower_string(), role=UserRole.ADMIN
+        ),
+    )
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/{admin.id}",
+        headers=superuser_token_headers,
+        json={"is_superuser": False},
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["loc"] == ["body", "is_superuser"]
+    db.refresh(admin)
+    assert admin.role == UserRole.ADMIN
+
+
+def test_update_user_with_unknown_field_applies_nothing(
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+) -> None:
+    user = create_random_user(db)
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/{user.id}",
+        headers=superuser_token_headers,
+        json={"full_name": "Changed Name", "is_superuser": False},
+    )
+    assert r.status_code == 422
+    db.refresh(user)
+    assert user.full_name != "Changed Name"
+
+
+def test_update_user_rejects_misspelled_field(
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+) -> None:
+    user = create_random_user(db)
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/{user.id}",
+        headers=superuser_token_headers,
+        json={"is_activ": False},
+    )
+    assert r.status_code == 422
+    db.refresh(user)
+    assert user.is_active is True
+
+
+def test_create_user_rejects_removed_is_superuser_field(
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+) -> None:
+    email = random_email()
+    r = client.post(
+        f"{settings.API_V1_STR}/users/",
+        headers=superuser_token_headers,
+        json={"email": email, "password": random_lower_string(), "is_superuser": True},
+    )
+    assert r.status_code == 422
+    assert crud.get_user_by_email(session=db, email=email) is None
