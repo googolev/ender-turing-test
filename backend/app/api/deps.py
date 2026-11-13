@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Annotated
 
 import jwt
@@ -11,7 +11,8 @@ from sqlmodel import Session
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.models import TokenPayload, User, UserRole
+from app.core.permissions import Permission, has_permission
+from app.models import TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -58,9 +59,19 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_current_active_superuser(current_user: CurrentUser) -> User:
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403, detail="The user doesn't have enough privileges"
-        )
-    return current_user
+def forbidden() -> HTTPException:
+    return HTTPException(
+        status_code=403, detail="The user doesn't have enough privileges"
+    )
+
+
+def require_permission(permission: Permission) -> Callable[[User], User]:
+    """Dependency that lets the request through only if the user's role grants
+    the permission: `dependencies=[Depends(require_permission(...))]`."""
+
+    def check(current_user: CurrentUser) -> User:
+        if not has_permission(current_user.role, permission):
+            raise forbidden()
+        return current_user
+
+    return check

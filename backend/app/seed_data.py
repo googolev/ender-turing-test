@@ -15,7 +15,8 @@ from sqlmodel import Session, func, select
 from app import crud
 from app.core.config import settings
 from app.core.db import engine
-from app.models import Item, ItemCreate, User, UserCreate, UserRole
+from app.core.permissions import UserRole
+from app.models import Item, ItemCreate, User, UserCreate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

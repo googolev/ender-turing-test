@@ -1,21 +1,16 @@
 import uuid
 from datetime import UTC, datetime
-from enum import StrEnum
 
 import sqlalchemy as sa
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 from sqlmodel._compat import SQLModelConfig  # SQLModel's own config type
 
+from app.core.permissions import Permission, UserRole
+
 
 def get_datetime_utc() -> datetime:
     return datetime.now(UTC)
-
-
-class UserRole(StrEnum):
-    ADMIN = "admin"
-    MANAGER = "manager"
-    MEMBER = "member"
 
 
 # Stored as VARCHAR with a CHECK constraint (not a native Postgres enum),
@@ -97,6 +92,12 @@ class UserPublic(UserBase):
     created_at: datetime | None = None
 
 
+# The current user, with the permissions derived from their role. The frontend
+# shows or hides features from this list instead of knowing the role rules.
+class UserMePublic(UserPublic):
+    permissions: list[Permission]
+
+
 class UsersPublic(SQLModel):
     data: list[UserPublic]
     count: int
@@ -160,3 +161,10 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class MetricsPublic(SQLModel):
+    users_total: int
+    users_active: int
+    users_by_role: dict[UserRole, int]
+    items_total: int
