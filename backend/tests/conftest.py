@@ -14,6 +14,13 @@ from tests.utils.utils import get_superuser_token_headers
 
 @pytest.fixture(scope="session", autouse=True)
 def db() -> Generator[Session]:
+    if not str(engine.url.database).endswith("_test"):
+        pytest.exit(
+            f"Refusing to run: tests delete all users and items, but DATABASE_URL "
+            f"points to '{engine.url.database}'. Tests must run against a *_test "
+            f"database: run them with `bash scripts/tests-start.sh`.",
+            returncode=2,
+        )
     with Session(engine) as session:
         init_db(session)
         yield session
