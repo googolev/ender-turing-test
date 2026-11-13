@@ -27,6 +27,16 @@ SessionDep = Annotated[Session, Depends(get_db)]
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
 
+def _unauthorized(detail: str) -> HTTPException:
+    # 401 means "this session is no longer valid": the frontend logs out on it.
+    # Missing permissions are 403 and must not end the session.
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 def get_current_user(session: SessionDep, token: TokenDep) -> User:
     try:
         payload = jwt.decode(
@@ -34,15 +44,14 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         )
         token_data = TokenPayload(**payload)
     except InvalidTokenError, ValidationError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
-        )
+        raise _unauthorized("Could not validate credentials")
+    # The user is re-read on every request, so deactivation and deletion
+    # take effect for sessions that already hold a token.
     user = session.get(User, token_data.sub)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise _unauthorized("User not found")
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise _unauthorized("Inactive user")
     return user
 
 

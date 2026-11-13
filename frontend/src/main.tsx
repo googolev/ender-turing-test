@@ -20,12 +20,17 @@ client.setConfig({
 })
 
 const handleApiError = (error: Error) => {
-  if (
-    error instanceof AxiosError &&
-    [401, 403].includes(error.response?.status ?? 0)
-  ) {
+  if (!(error instanceof AxiosError)) return
+  const status = error.response?.status
+  if (status === 401) {
+    // The session is gone: bad or expired token, or the user was deactivated or deleted.
     localStorage.removeItem("access_token")
     window.location.href = "/login"
+  } else if (status === 403) {
+    // Access denied, but the session is still valid. The user's access may have
+    // changed, so refresh the current user and re-run the route guards.
+    queryClient.invalidateQueries({ queryKey: ["currentUser"] })
+    router.invalidate()
   }
 }
 const queryClient = new QueryClient({

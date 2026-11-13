@@ -1,4 +1,24 @@
-import { expect, type Page } from "@playwright/test"
+import { type APIRequestContext, expect, type Page } from "@playwright/test"
+import { firstSuperuser, firstSuperuserPassword } from "../config.ts"
+
+const apiUrl = `${process.env.VITE_API_URL}/api/v1`
+
+export async function setUserActive(
+  request: APIRequestContext,
+  userId: string,
+  isActive: boolean,
+) {
+  const login = await request.post(`${apiUrl}/login/access-token`, {
+    form: { username: firstSuperuser, password: firstSuperuserPassword },
+  })
+  expect(login.ok()).toBeTruthy()
+  const { access_token } = await login.json()
+  const response = await request.patch(`${apiUrl}/users/${userId}`, {
+    headers: { Authorization: `Bearer ${access_token}` },
+    data: { is_active: isActive },
+  })
+  expect(response.ok()).toBeTruthy()
+}
 
 export async function signUpNewUser(
   page: Page,
