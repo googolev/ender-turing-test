@@ -4,21 +4,21 @@ Each test runs alembic against its own throwaway database, seeded at the
 revision before roles existed, the way a populated production database is.
 """
 
+import os
+import subprocess
+import sys
 import uuid
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import URL, create_engine, text
+from sqlalchemy import URL, create_engine, make_url, text
 from sqlalchemy.exc import IntegrityError
 
-from tests.prepare_db import (
-    create_database,
-    drop_database,
-    get_test_database_url,
-    run_alembic,
-)
+from app.core.config import settings
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 BEFORE_ROLES = "fe56fa70289e"
 
 # email: (is_superuser, is_active)
@@ -32,13 +32,27 @@ EXISTING_USERS = {
 
 @pytest.fixture
 def db_url() -> Generator[URL]:
-    name = f"app_migration_{uuid.uuid4().hex[:12]}"
-    url = get_test_database_url().set(database=name)
-    create_database(url)
+    """A throwaway database on the application's server, dropped afterwards."""
+    app_url = make_url(str(settings.DATABASE_URL))
+    url = app_url.set(database=f"migration_test_{uuid.uuid4().hex[:12]}")
+    server = create_engine(
+        app_url.set(database="postgres"), isolation_level="AUTOCOMMIT"
+    )
+    with server.connect() as conn:
+        conn.execute(text(f'CREATE DATABASE "{url.database}"'))
     try:
         yield url
     finally:
-        drop_database(url)
+        with server.connect() as conn:
+            conn.execute(text(f'DROP DATABASE IF EXISTS "{url.database}" WITH (FORCE)'))
+        server.dispose()
+
+
+def run_alembic(url: URL, *args: str) -> None:
+    env = {**os.environ, "DATABASE_URL": url.render_as_string(hide_password=False)}
+    subprocess.run(
+        ["alembic", *args], cwd=BACKEND_DIR, env=env, check=True, stdout=sys.stderr
+    )
 
 
 def sql(url: URL, statement: str, **params: Any) -> list[Any]:
