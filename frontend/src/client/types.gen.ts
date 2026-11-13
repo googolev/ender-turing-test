@@ -123,6 +123,30 @@ export type Message = {
 };
 
 /**
+ * MetricsPublic
+ */
+export type MetricsPublic = {
+    /**
+     * Users Total
+     */
+    users_total: number;
+    /**
+     * Users Active
+     */
+    users_active: number;
+    /**
+     * Users By Role
+     */
+    users_by_role: {
+        [key in UserRole]?: number;
+    };
+    /**
+     * Items Total
+     */
+    items_total: number;
+};
+
+/**
  * NewPassword
  */
 export type NewPassword = {
@@ -135,6 +159,11 @@ export type NewPassword = {
      */
     new_password: string;
 };
+
+/**
+ * Permission
+ */
+export type Permission = 'users:read' | 'users:manage' | 'metrics:read' | 'items:all' | 'system:manage';
 
 /**
  * PrivateUserCreate
@@ -207,6 +236,37 @@ export type UserCreate = {
      * Password
      */
     password: string;
+};
+
+/**
+ * UserMePublic
+ */
+export type UserMePublic = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Is Active
+     */
+    is_active?: boolean;
+    role?: UserRole;
+    /**
+     * Full Name
+     */
+    full_name?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Permissions
+     */
+    permissions: Array<Permission>;
 };
 
 /**
@@ -550,7 +610,7 @@ export type usersReadUserMeResponses = {
     /**
      * Successful Response
      */
-    200: UserPublic;
+    200: UserMePublic;
 };
 
 export type usersReadUserMeResponse = usersReadUserMeResponses[keyof usersReadUserMeResponses];
@@ -916,6 +976,22 @@ export type itemsUpdateItemResponses = {
 };
 
 export type itemsUpdateItemResponse = itemsUpdateItemResponses[keyof itemsUpdateItemResponses];
+
+export type metricsReadMetricsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/metrics/';
+};
+
+export type metricsReadMetricsResponses = {
+    /**
+     * Successful Response
+     */
+    200: MetricsPublic;
+};
+
+export type metricsReadMetricsResponse = metricsReadMetricsResponses[keyof metricsReadMetricsResponses];
 
 export type privateCreateUserData = {
     body: PrivateUserCreate;
