@@ -100,22 +100,9 @@ The migration `91ade4d27122` replaced `is_superuser` with `role`: existing super
 
 ### Try the Three Roles Locally
 
-With the stack running, create demo users:
-
-```bash
-docker compose exec backend python -m app.seed_data
-```
-
-On a fresh database this gives:
-
-| Email | Password | Role |
-|---|---|---|
-| `admin@example.com` | `FIRST_SUPERUSER_PASSWORD` from `.env` (`changethis`) | admin |
-| `manager@example.com` | `password123` | manager |
-| `alice@example.com`, `bob@example.com`, `carol@example.com`, `dave@example.com` | `password123` | member |
-| `inactive@example.com` | `password123` | member, inactive (cannot log in) |
-
-The seed only creates users that do not exist yet and never changes existing ones. It is not part of `scripts/prestart.sh`, so demo users never reach a deployed database.
+1. Log in with the `FIRST_SUPERUSER` and `FIRST_SUPERUSER_PASSWORD` from `.env`. This user is an admin.
+2. On the **Users** page, use **Add User** to create a manager and a member: pick the role in the **Role** field and check **Is active?**.
+3. Log in as each of them, for example in a private browser window, to see what their role allows. An admin can change any other user's role or active status with **Edit User** while that user is logged in.
 
 ## Mailpit
 
