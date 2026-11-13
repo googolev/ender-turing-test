@@ -1,7 +1,7 @@
 """Fill the local database with demo users and items.
 
-Idempotent: existing users are skipped, and items are only added
-to users that have none yet.
+Idempotent: existing users are skipped (their role and status are never
+changed), and items are only added to users that have none yet.
 
 Run inside the backend container:
     docker compose exec backend python -m app.seed_data
@@ -15,7 +15,7 @@ from sqlmodel import Session, func, select
 from app import crud
 from app.core.config import settings
 from app.core.db import engine
-from app.models import Item, ItemCreate, User, UserCreate
+from app.models import Item, ItemCreate, User, UserCreate, UserRole
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ USERS: list[dict[str, Any]] = [
     {
         "email": "manager@example.com",
         "full_name": "Maria Manager",
-        "is_superuser": True,
+        "role": UserRole.MANAGER,
     },
     {"email": "alice@example.com", "full_name": "Alice Anderson"},
     {"email": "bob@example.com", "full_name": "Bob Brown"},
